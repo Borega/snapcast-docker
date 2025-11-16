@@ -24,8 +24,9 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # Clone latest librespot
 RUN git clone --depth=1 https://github.com/librespot-org/librespot.git /src/librespot
 
-# Build librespot
+# Build librespot with dynamic linking
 WORKDIR /src/librespot
+ENV RUSTFLAGS="-C target-feature=-crt-static"
 RUN cargo build --release
 
 # ========================================
