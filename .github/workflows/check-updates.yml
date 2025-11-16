@@ -1,0 +1,63 @@
+name: Check for Updates
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  check-updates:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Check librespot latest release
+        id: librespot
+        run: |
+          LATEST=$(curl -s https://api.github.com/repos/librespot-org/librespot/releases/latest | jq -r '.tag_name')
+          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+          echo "Librespot latest release: $LATEST"
+      
+      - name: Check snapcast latest release
+        id: snapcast
+        run: |
+          LATEST=$(curl -s https://api.github.com/repos/badaix/snapcast/releases/latest | jq -r '.tag_name')
+          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+          echo "Snapcast latest release: $LATEST"
+      
+      - name: Check stored versions
+        id: stored
+        run: |
+          if [ -f .versions ]; then
+            LIBRESPOT_STORED=$(grep "LIBRESPOT=" .versions | cut -d'=' -f2)
+            SNAPCAST_STORED=$(grep "SNAPCAST=" .versions | cut -d'=' -f2)
+          else
+            LIBRESPOT_STORED="none"
+            SNAPCAST_STORED="none"
+          fi
+          echo "librespot=$LIBRESPOT_STORED" >> $GITHUB_OUTPUT
+          echo "snapcast=$SNAPCAST_STORED" >> $GITHUB_OUTPUT
+          echo "Stored versions - Librespot: $LIBRESPOT_STORED, Snapcast: $SNAPCAST_STORED"
+      
+      - name: Update versions file and trigger rebuild
+        if: |
+          steps.librespot.outputs.latest != steps.stored.outputs.librespot ||
+          steps.snapcast.outputs.latest != steps.stored.outputs.snapcast
+        run: |
+          echo "LIBRESPOT=${{ steps.librespot.outputs.latest }}" > .versions
+          echo "SNAPCAST=${{ steps.snapcast.outputs.latest }}" >> .versions
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .versions
+          git commit -m "Update dependencies: librespot ${{ steps.librespot.outputs.latest }}, snapcast ${{ steps.snapcast.outputs.latest }}"
+          git push
+      
+      - name: No updates found
+        if: |
+          steps.librespot.outputs.latest == steps.stored.outputs.librespot &&
+          steps.snapcast.outputs.latest == steps.stored.outputs.snapcast
+        run: |
+          echo "No updates found. Current versions are up to date."
