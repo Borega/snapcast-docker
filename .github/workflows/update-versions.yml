@@ -23,20 +23,20 @@ jobs:
           echo "snapcast=${SNAPCAST_VERSION}" >> $GITHUB_OUTPUT
           echo "librespot=${LIBRESPOT_VERSION}" >> $GITHUB_OUTPUT
 
-      - name: Update README placeholders
+      - name: Render README from template
         run: |
-          set -e
+          cp README.template.md README.md
           sed -i "s/{{SNAPCAST_VERSION}}/${{ steps.versions.outputs.snapcast }}/g" README.md
           sed -i "s/{{LIBRESPOT_VERSION}}/${{ steps.versions.outputs.librespot }}/g" README.md
 
       - name: Detect changes
         id: gitcheck
         run: |
-          if git diff --quiet README.md; then
-            echo "changed=false" >> $GITHUB_OUTPUT
-          else
-            echo "changed=true" >> $GITHUB_OUTPUT
-          fi
+            if git diff --quiet README.md; then
+              echo "changed=false" >> $GITHUB_OUTPUT
+            else
+              echo "changed=true" >> $GITHUB_OUTPUT
+            fi
 
       - name: Commit and push
         if: steps.gitcheck.outputs.changed == 'true'
