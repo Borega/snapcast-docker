@@ -10,7 +10,9 @@ RUN apk add --no-cache \
     build-base \
     pkgconfig \
     openssl-dev \
+    openssl-libs-static \
     alsa-lib-dev \
+    alsa-lib-static \
     pulseaudio-dev
 
 # Install rustup and latest stable Rust (edition 2024 support)
