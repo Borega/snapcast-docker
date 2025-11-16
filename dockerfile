@@ -11,7 +11,6 @@ RUN apk add --no-cache \
     pkgconfig \
     openssl-dev \
     alsa-lib-dev \
-    alsa-lib-dev \
     pulseaudio-dev
 
 # Install rustup and latest stable Rust (edition 2024 support)
@@ -84,6 +83,14 @@ RUN echo '#!/bin/sh' > /entrypoint.sh && \
     echo 'mkdir -p /var/run/dbus' >> /entrypoint.sh && \
     echo 'dbus-daemon --system' >> /entrypoint.sh && \
     echo 'avahi-daemon --daemonize' >> /entrypoint.sh && \
+    echo '' >> /entrypoint.sh && \
+    echo '# Start librespot if enabled' >> /entrypoint.sh && \
+    echo 'if [ "$START_LIBRESPOT" = "true" ]; then' >> /entrypoint.sh && \
+    echo '  rm -f /tmp/snapfifo' >> /entrypoint.sh && \
+    echo '  mkfifo /tmp/snapfifo' >> /entrypoint.sh && \
+    echo '  /usr/local/bin/librespot --name "${LIBRESPOT_NAME:-Snapcast}" --backend pipe --device /tmp/snapfifo --bitrate ${LIBRESPOT_BITRATE:-320} --initial-volume 100 &' >> /entrypoint.sh && \
+    echo 'fi' >> /entrypoint.sh && \
+    echo '' >> /entrypoint.sh && \
     echo 'exec "$@"' >> /entrypoint.sh && \
     chmod +x /entrypoint.sh
 
