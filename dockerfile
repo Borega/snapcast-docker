@@ -54,8 +54,8 @@ RUN apk add --no-cache \
     openssl \
     alsa-lib \
     soxr \
-    boost-system \
-    boost-thread \
+    boost1.82-system \
+    boost1.82-thread \
     pulseaudio-libs
 
 # Copy built binaries
