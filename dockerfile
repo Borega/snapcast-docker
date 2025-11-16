@@ -38,7 +38,14 @@ RUN apk add --no-cache \
     cmake \
     boost-dev \
     alsa-lib-dev \
-    soxr-dev
+    soxr-dev \
+    avahi-dev \
+    flac-dev \
+    libogg-dev \
+    libvorbis-dev \
+    opus-dev \
+    expat-dev \
+    openssl-dev
 
 RUN git clone --depth=1 https://github.com/badaix/snapcast.git /src/snapcast
 
@@ -56,7 +63,13 @@ RUN apk add --no-cache \
     soxr \
     boost1.82-system \
     boost1.82-thread \
-    libpulse
+    libpulse \
+    avahi-libs \
+    flac-libs \
+    libogg \
+    libvorbis \
+    opus \
+    expat
 
 # Copy built binaries
 COPY --from=build-librespot /src/librespot/target/release/librespot /usr/local/bin/librespot
