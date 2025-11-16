@@ -67,6 +67,8 @@ RUN apk add --no-cache \
     boost1.82-thread \
     libpulse \
     avahi-libs \
+    avahi \
+    dbus \
     flac-libs \
     libogg \
     libvorbis \
@@ -77,4 +79,13 @@ RUN apk add --no-cache \
 COPY --from=build-librespot /src/librespot/target/release/librespot /usr/local/bin/librespot
 COPY --from=build-snapcast /src/snapcast/bin/snapserver /usr/local/bin/snapserver
 
+# Create entrypoint script
+RUN echo '#!/bin/sh' > /entrypoint.sh && \
+    echo 'mkdir -p /var/run/dbus' >> /entrypoint.sh && \
+    echo 'dbus-daemon --system' >> /entrypoint.sh && \
+    echo 'avahi-daemon --daemonize' >> /entrypoint.sh && \
+    echo 'exec "$@"' >> /entrypoint.sh && \
+    chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["/bin/sh"]
