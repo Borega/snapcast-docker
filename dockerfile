@@ -56,7 +56,7 @@ RUN apk add --no-cache \
     soxr \
     boost1.82-system \
     boost1.82-thread \
-    pulseaudio-libs
+    libpulse
 
 # Copy built binaries
 COPY --from=build-librespot /src/librespot/target/release/librespot /usr/local/bin/librespot
