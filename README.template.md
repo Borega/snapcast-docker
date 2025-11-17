@@ -5,9 +5,11 @@ A Docker image providing the Snapcast server plus optional Spotify Connect via L
 ## Features
 - 🎵 **Snapcast Server {{SNAPCAST_VERSION}}** – Multi-room audio streaming
 - 🎧 **Librespot {{LIBRESPOT_VERSION}}** – Spotify Connect integration
-- 🔄 **Auto-updates** – Rebuilds when upstream releases change
-- 🐳 **Minimal Alpine image** – Built from source
-- 🔊 **Avahi/mDNS support** – Client discovery on the LAN
+- 🔄 **Automated updates** – Daily checks for new releases with automatic rebuilds
+- 🏗️ **Multi-stage build** – Optimized Docker image built from source
+- 🐳 **Minimal Alpine {{ALPINE_VERSION}} base** – Small footprint, secure foundation
+- 🔊 **Avahi/mDNS support** – Automatic client discovery on the LAN
+- 🤖 **CI/CD automation** – Nightly builds, Alpine auto-bumping, and automated PRs
 
 ## Image
 `ghcr.io/borega/snapcast-docker:latest`
@@ -51,13 +53,41 @@ Write PCM/FLAC-compatible data into `/tmp/snapfifo` (created automatically when 
 cat track.wav > /tmp/snapfifo
 ```
 
-## Updating Versions
-Automated workflow replaces placeholders in this template and commits generated `README.md`.
+## Build Process
+This image uses a **multi-stage Docker build**:
+1. **Stage 1**: Builds Librespot from source with latest Rust toolchain
+2. **Stage 2**: Builds Snapcast from source with all dependencies
+3. **Stage 3**: Creates minimal runtime image with only necessary libraries
+
+Both Snapcast and Librespot are compiled from their latest releases, ensuring you always get the newest features and fixes.
+
+## Automated Workflows
+This project includes several GitHub Actions workflows:
+- **Daily version checks** – Monitors upstream releases and triggers rebuilds
+- **Nightly builds** – Validates the build daily and creates issues on failure
+- **Alpine auto-bump** – Tests newer Alpine versions and creates PRs automatically
+- **README updates** – Keeps version numbers current in documentation
+- **Docker image publishing** – Builds and pushes to GitHub Container Registry on changes
+
+## Architecture
+- **Base**: Alpine Linux {{ALPINE_VERSION}}
+- **Build method**: Multi-stage Docker build from source
+- **Platforms**: Built for amd64 (additional architectures can be added)
+- **Entrypoint**: Custom script that manages D-Bus, Avahi, and optional Librespot startup
 
 ## Troubleshooting
-- Missing config warning: benign unless you supply `/etc/snapserver.conf`.
-- No Spotify device: ensure START_LIBRESPOT=true.
-- Avahi errors: host networking required; ensure `avahi-daemon` started by entrypoint.
+- **Missing config warning**: Benign unless you supply `/etc/snapserver.conf`
+- **No Spotify device**: Ensure `START_LIBRESPOT=true` is set
+- **Avahi errors**: Host networking required; `avahi-daemon` is started automatically by entrypoint
+- **Build failures**: Check the Issues tab; nightly builds create issues automatically on failure
+- **Outdated versions**: The image rebuilds automatically when new releases are detected
+
+## Contributing
+This project is fully automated:
+- Version updates are detected and applied automatically
+- Alpine base image updates are tested and proposed via PR
+- Build failures trigger issue creation for investigation
+- Manual workflow triggers are available via GitHub Actions for all processes
 
 ## License
 Upstream projects under their respective licenses; this repository under GPL-3.0.
