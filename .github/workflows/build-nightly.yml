@@ -1,0 +1,28 @@
+name: Nightly build and report
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        id: build
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          docker buildx create --use
+          docker buildx build -f dockerfile . --load 2>&1 | tee build.log
+          echo "status=$?" >> $GITHUB_OUTPUT
+
+      - name: Create issue on failure
+        if: steps.build.outputs.status != '0'
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          title: "Build failed: dependency change detected"
+          content-filepath: build.log
+          labels: build, needs-triage

@@ -1,0 +1,76 @@
+name: Try newer Alpine and auto-PR
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  build-matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        alpine: [ "3.19", "3.20" ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build with ALPINE_VERSION=${{ matrix.alpine }}
+        run: |
+          docker buildx create --use
+          docker buildx build --build-arg ALPINE_VERSION=${{ matrix.alpine }} -f dockerfile . --load
+
+      - name: Record success
+        if: success()
+        run: echo "${{ matrix.alpine }}" >> .alpine-success
+
+      - name: Upload matrix result
+        uses: actions/upload-artifact@v4
+        with:
+          name: alpine-success
+          path: .alpine-success
+          if-no-files-found: ignore
+
+  decide-and-pr:
+    needs: build-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: alpine-success
+          path: .
+
+      - name: Get current and best passing versions
+        id: pick
+        shell: bash
+        run: |
+          set -e
+          CURR=$(grep -Eo 'ARG ALPINE_VERSION=[0-9. ]+' dockerfile | awk -F= '{print $2}' | tr -d ' ')
+          BEST=$(sort -V .alpine-success | tail -n1 || true)
+          echo "curr=$CURR" >> $GITHUB_OUTPUT
+          echo "best=$BEST" >> $GITHUB_OUTPUT
+
+      - name: No suitable newer Alpine found
+        if: steps.pick.outputs.best == '' || steps.pick.outputs.best == steps.pick.outputs.curr
+        run: echo "Nothing to do."
+
+      - name: Bump ARG ALPINE_VERSION and create PR
+        if: steps.pick.outputs.best != '' && steps.pick.outputs.best != steps.pick.outputs.curr
+        run: |
+          set -e
+          sed -i "s/ARG ALPINE_VERSION=.*/ARG ALPINE_VERSION=${{ steps.pick.outputs.best }}/" dockerfile
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b chore/bump-alpine-${{ steps.pick.outputs.best }}
+          git commit -am "chore: bump Alpine to ${{ steps.pick.outputs.best }}"
+          git push -u origin HEAD
+      - name: Open PR
+        if: steps.pick.outputs.best != '' && steps.pick.outputs.best != steps.pick.outputs.curr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          title: "chore: bump Alpine to ${{ steps.pick.outputs.best }}"
+          branch: chore/bump-alpine-${{ steps.pick.outputs.best }}
+          commit-message: "chore: bump Alpine to ${{ steps.pick.outputs.best }}"
+          body: "Automated bump after successful build on Alpine ${{ steps.pick.outputs.best }}."
