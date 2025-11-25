@@ -47,6 +47,7 @@ RUN apk add --no-cache \
 # Copy built binaries
 COPY --from=build-librespot /src/librespot/target/release/librespot /usr/local/bin/librespot
 COPY --from=build-snapcast /src/snapcast/bin/snapserver /usr/local/bin/snapserver
+COPY snapserver.conf /etc/snapserver.conf
 
 # Create entrypoint script
 RUN echo '#!/bin/sh' > /entrypoint.sh && \
