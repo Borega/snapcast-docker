@@ -38,13 +38,19 @@ version: "3"
 services:
   snapcast:
     image: ghcr.io/borega/snapcast-docker:latest
+    hostname: snapcast
     network_mode: host
     restart: unless-stopped
     environment:
       - START_LIBRESPOT=true
       - LIBRESPOT_NAME=Snapcast
       - LIBRESPOT_BITRATE=320
-    command: /usr/local/bin/snapserver -s pipe:///tmp/snapfifo?name=Spotify
+    volumes:
+      - snapserver-conf:/config
+    command: ["/usr/local/bin/snapserver", "-c", "/config/snapserver.conf"]
+
+volumes:
+  snapserver-conf:
 ```
 
 ## Supplying Audio
@@ -60,6 +66,58 @@ This image uses a **multi-stage Docker build**:
 3. **Stage 3**: Creates minimal runtime image with only necessary libraries
 
 Both Snapcast and Librespot are compiled from their latest releases, ensuring you always get the newest features and fixes.
+
+## Configuration File
+Create `/config/snapserver.conf` (mounted via the named volume) to set stream defaults and avoid shell quoting issues:
+```ini
+[stream]
+sampleformat = 44100:16:2
+codec = flac
+chunk_ms = 20
+buffer = 1000
+send_to_muted = false
+
+source = pipe:///tmp/snapfifo?name=Spotify&mode=create
+
+[streaming_client]
+initial_volume = 100
+
+[http]
+enabled = true
+bind = 0.0.0.0
+port = 1780
+```
+
+Initialize the config volume on Windows (PowerShell):
+```powershell
+docker volume create snapserver-conf
+$conf = @"
+[stream]
+sampleformat = 44100:16:2
+codec = flac
+chunk_ms = 20
+buffer = 1000
+send_to_muted = false
+source = pipe:///tmp/snapfifo?name=Spotify&mode=create
+
+[streaming_client]
+initial_volume = 100
+
+[http]
+enabled = true
+bind = 0.0.0.0
+port = 1780
+"@
+docker run --rm -v snapserver-conf:/config alpine sh -c "cat > /config/snapserver.conf" <<< $conf
+```
+
+## Audio Settings
+- Sample rate controls PCM format (e.g., `44100:16:2`); bitrate controls Spotify stream quality (`LIBRESPOT_BITRATE`, e.g., 320 kbps).
+- Librespot outputs 44.1 kHz; matching Snapserver to `44100:16:2` avoids resampling and “too fast” playback.
+- If not using a config file, pass the stream inline and quote `&`:
+```bash
+/usr/local/bin/snapserver -s "pipe:///tmp/snapfifo?name=Spotify&sampleformat=44100:16:2"
+```
 
 ## Automated Workflows
 This project includes several GitHub Actions workflows:
