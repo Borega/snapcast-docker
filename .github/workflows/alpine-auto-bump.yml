@@ -11,66 +11,89 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        alpine: [ "3.19", "3.20" ]
+        alpine: [ "3.19", "3.20", "3.21" ]
     steps:
       - uses: actions/checkout@v4
 
       - name: Build with ALPINE_VERSION=${{ matrix.alpine }}
+        id: build
+        continue-on-error: true
         run: |
           docker buildx create --use
-          docker buildx build --build-arg ALPINE_VERSION=${{ matrix.alpine }} -f dockerfile . --load
+          docker buildx build \
+            --build-arg ALPINE_VERSION=${{ matrix.alpine }} \
+            -f dockerfile . \
+            --load
 
       - name: Record success
-        if: success()
+        if: steps.build.outcome == 'success'
         run: echo "${{ matrix.alpine }}" >> .alpine-success
+
+      - name: Ensure artifact file exists
+        run: touch .alpine-success
 
       - name: Upload matrix result
         uses: actions/upload-artifact@v4
         with:
-          name: alpine-success
+          name: alpine-result-${{ matrix.alpine }}
           path: .alpine-success
-          if-no-files-found: ignore
+          if-no-files-found: warn
 
   decide-and-pr:
     needs: build-matrix
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v4
         with:
-          name: alpine-success
-          path: .
+          pattern: alpine-result-*
+          merge-multiple: true
 
       - name: Get current and best passing versions
         id: pick
         shell: bash
         run: |
-          set -e
-          CURR=$(grep -Eo 'ARG ALPINE_VERSION=[0-9. ]+' dockerfile | awk -F= '{print $2}' | tr -d ' ')
-          BEST=$(sort -V .alpine-success | tail -n1 || true)
-          echo "curr=$CURR" >> $GITHUB_OUTPUT
-          echo "best=$BEST" >> $GITHUB_OUTPUT
+          CURRENT=$(grep -Eo 'ARG ALPINE_VERSION=[0-9.]+' dockerfile | awk -F= '{print $2}')
+          echo "current=${CURRENT}" >> $GITHUB_OUTPUT
+          
+          if [ -s .alpine-success ]; then
+            BEST=$(sort -V .alpine-success | tail -1)
+            echo "best=${BEST}" >> $GITHUB_OUTPUT
+            echo "has_upgrade=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_upgrade=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: No suitable newer Alpine found
-        if: steps.pick.outputs.best == '' || steps.pick.outputs.best == steps.pick.outputs.curr
-        run: echo "Nothing to do."
+        if: steps.pick.outputs.has_upgrade == 'false'
+        run: echo "No newer Alpine version passed the build test"
 
       - name: Bump ARG ALPINE_VERSION and create PR
-        if: steps.pick.outputs.best != '' && steps.pick.outputs.best != steps.pick.outputs.curr
+        if: steps.pick.outputs.has_upgrade == 'true' && steps.pick.outputs.best != steps.pick.outputs.current
         run: |
-          set -e
-          sed -i "s/ARG ALPINE_VERSION=.*/ARG ALPINE_VERSION=${{ steps.pick.outputs.best }}/" dockerfile
+          BEST=${{ steps.pick.outputs.best }}
+          sed -i "s/ARG ALPINE_VERSION=[0-9.]*/ARG ALPINE_VERSION=${BEST}/" dockerfile
+          
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b chore/bump-alpine-${{ steps.pick.outputs.best }}
-          git commit -am "chore: bump Alpine to ${{ steps.pick.outputs.best }}"
-          git push -u origin HEAD
+          git checkout -b alpine-bump-${BEST}
+          git add dockerfile
+          git commit -m "chore: bump Alpine to ${BEST}"
+          git push -f origin alpine-bump-${BEST}
+
       - name: Open PR
-        if: steps.pick.outputs.best != '' && steps.pick.outputs.best != steps.pick.outputs.curr
+        if: steps.pick.outputs.has_upgrade == 'true' && steps.pick.outputs.best != steps.pick.outputs.current
         uses: peter-evans/create-pull-request@v6
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: alpine-bump-${{ steps.pick.outputs.best }}
           title: "chore: bump Alpine to ${{ steps.pick.outputs.best }}"
-          branch: chore/bump-alpine-${{ steps.pick.outputs.best }}
-          commit-message: "chore: bump Alpine to ${{ steps.pick.outputs.best }}"
-          body: "Automated bump after successful build on Alpine ${{ steps.pick.outputs.best }}."
+          body: |
+            Automated Alpine version bump from ${{ steps.pick.outputs.current }} to ${{ steps.pick.outputs.best }}.
+            
+            ✅ Build passed for Alpine ${{ steps.pick.outputs.best }}
+          labels: dependencies, automated
