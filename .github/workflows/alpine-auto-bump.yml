@@ -25,19 +25,19 @@ jobs:
             -f dockerfile . \
             --load
 
-      - name: Record success
-        if: steps.build.outcome == 'success'
-        run: echo "${{ matrix.alpine }}" >> .alpine-success
-
-      - name: Ensure artifact file exists
-        run: touch .alpine-success
+      - name: Record result
+        run: |
+          if [ "${{ steps.build.outcome }}" == "success" ]; then
+            echo "${{ matrix.alpine }}" > alpine-result.txt
+          else
+            echo "failed" > alpine-result.txt
+          fi
 
       - name: Upload matrix result
         uses: actions/upload-artifact@v4
         with:
           name: alpine-result-${{ matrix.alpine }}
-          path: .alpine-success
-          if-no-files-found: warn
+          path: alpine-result.txt
 
   decide-and-pr:
     needs: build-matrix
@@ -51,7 +51,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           pattern: alpine-result-*
-          merge-multiple: true
+          path: results
 
       - name: Get current and best passing versions
         id: pick
@@ -60,12 +60,26 @@ jobs:
           CURRENT=$(grep -Eo 'ARG ALPINE_VERSION=[0-9.]+' dockerfile | awk -F= '{print $2}')
           echo "current=${CURRENT}" >> $GITHUB_OUTPUT
           
-          if [ -s .alpine-success ]; then
-            BEST=$(sort -V .alpine-success | tail -1)
+          # Collect successful Alpine versions
+          SUCCESS_FILE=$(mktemp)
+          for dir in results/alpine-result-*; do
+            if [ -f "$dir/alpine-result.txt" ]; then
+              CONTENT=$(cat "$dir/alpine-result.txt")
+              if [ "$CONTENT" != "failed" ]; then
+                echo "$CONTENT" >> "$SUCCESS_FILE"
+              fi
+            fi
+          done
+          
+          if [ -s "$SUCCESS_FILE" ]; then
+            BEST=$(sort -V "$SUCCESS_FILE" | tail -1)
             echo "best=${BEST}" >> $GITHUB_OUTPUT
             echo "has_upgrade=true" >> $GITHUB_OUTPUT
+            echo "Found successful builds: $(cat $SUCCESS_FILE | tr '\n' ' ')"
+            echo "Best version: ${BEST}"
           else
             echo "has_upgrade=false" >> $GITHUB_OUTPUT
+            echo "No successful builds found"
           fi
 
       - name: No suitable newer Alpine found
