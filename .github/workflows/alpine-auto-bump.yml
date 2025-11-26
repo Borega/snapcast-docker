@@ -86,18 +86,11 @@ jobs:
         if: steps.pick.outputs.has_upgrade == 'false'
         run: echo "No newer Alpine version passed the build test"
 
-      - name: Bump ARG ALPINE_VERSION and create PR
+      - name: Bump ARG ALPINE_VERSION in dockerfile
         if: steps.pick.outputs.has_upgrade == 'true' && steps.pick.outputs.best != steps.pick.outputs.current
         run: |
           BEST=${{ steps.pick.outputs.best }}
           sed -i "s/ARG ALPINE_VERSION=[0-9.]*/ARG ALPINE_VERSION=${BEST}/" dockerfile
-          
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -b alpine-bump-${BEST}
-          git add dockerfile
-          git commit -m "chore: bump Alpine to ${BEST}"
-          git push -f origin alpine-bump-${BEST}
 
       - name: Open PR
         if: steps.pick.outputs.has_upgrade == 'true' && steps.pick.outputs.best != steps.pick.outputs.current
@@ -105,9 +98,11 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: alpine-bump-${{ steps.pick.outputs.best }}
+          commit-message: "chore: bump Alpine to ${{ steps.pick.outputs.best }}"
           title: "chore: bump Alpine to ${{ steps.pick.outputs.best }}"
           body: |
             Automated Alpine version bump from ${{ steps.pick.outputs.current }} to ${{ steps.pick.outputs.best }}.
             
             ✅ Build passed for Alpine ${{ steps.pick.outputs.best }}
           labels: dependencies, automated
+          delete-branch: true
