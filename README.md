@@ -7,7 +7,7 @@ A Docker image providing the Snapcast server plus optional Spotify Connect via L
 - 🎧 **Librespot 0.8.0** – Spotify Connect integration
 - 🔄 **Automated updates** – Daily checks for new releases with automatic rebuilds
 - 🏗️ **Multi-stage build** – Optimized Docker image built from source
-- 🐳 **Minimal Alpine 3.19 base** – Small footprint, secure foundation
+- 🐳 **Minimal Alpine 3.21 base** – Small footprint, secure foundation
 - 🔊 **Avahi/mDNS support** – Automatic client discovery on the LAN
 - 🤖 **CI/CD automation** – Nightly builds, Alpine auto-bumping, and automated PRs
 
@@ -128,7 +128,7 @@ This project includes several GitHub Actions workflows:
 - **Docker image publishing** – Builds and pushes to GitHub Container Registry on changes
 
 ## Architecture
-- **Base**: Alpine Linux 3.19
+- **Base**: Alpine Linux 3.21
 - **Build method**: Multi-stage Docker build from source
 - **Platforms**: Built for amd64 (additional architectures can be added)
 - **Entrypoint**: Custom script that manages D-Bus, Avahi, and optional Librespot startup
