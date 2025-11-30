@@ -41,7 +41,7 @@ RUN mkdir build && cd build && cmake .. && make -j$(nproc)
 # ========================================
 FROM alpine:${ALPINE_VERSION}
 RUN apk add --no-cache \
-  openssl alsa-lib soxr boost-libs libpulse avahi dbus \
+  openssl alsa-lib soxr boost-libs libpulse avahi avahi-tools dbus \
   flac-libs libogg libvorbis opus expat
 
 # Copy built binaries
@@ -51,19 +51,27 @@ COPY snapserver.conf /etc/snapserver.conf
 
 # Create entrypoint script
 RUN echo '#!/bin/sh' > /entrypoint.sh && \
+    echo '# Start DBus (required by Avahi)' >> /entrypoint.sh && \
     echo 'mkdir -p /var/run/dbus' >> /entrypoint.sh && \
-    echo 'dbus-daemon --system' >> /entrypoint.sh && \
-    echo 'avahi-daemon --daemonize' >> /entrypoint.sh && \
+    echo 'dbus-daemon --system --fork' >> /entrypoint.sh && \
     echo '' >> /entrypoint.sh && \
-    echo '# Start librespot if enabled' >> /entrypoint.sh && \
+    echo '# Start Avahi daemon' >> /entrypoint.sh && \
+    echo 'avahi-daemon --daemonize --no-chroot' >> /entrypoint.sh && \
+    echo '' >> /entrypoint.sh && \
+    echo '# Start Librespot if enabled' >> /entrypoint.sh && \
     echo 'if [ "$START_LIBRESPOT" = "true" ]; then' >> /entrypoint.sh && \
     echo '  rm -f /tmp/snapfifo' >> /entrypoint.sh && \
     echo '  mkfifo /tmp/snapfifo' >> /entrypoint.sh && \
-    echo '  /usr/local/bin/librespot --name "${LIBRESPOT_NAME:-Snapcast}" --backend pipe --device /tmp/snapfifo --bitrate ${LIBRESPOT_BITRATE:-320} --initial-volume 100 &' >> /entrypoint.sh && \
+    echo '  /usr/local/bin/librespot --name "${LIBRESPOT_NAME:-Snapcast}" \' >> /entrypoint.sh && \
+    echo '    --bitrate ${LIBRESPOT_BITRATE:-320} \' >> /entrypoint.sh && \
+    echo '    --backend pipe \' >> /entrypoint.sh && \
+    echo '    --device /tmp/snapfifo \' >> /entrypoint.sh && \
+    echo '    --initial-volume 100 &' >> /entrypoint.sh && \
     echo 'fi' >> /entrypoint.sh && \
     echo '' >> /entrypoint.sh && \
-    echo 'exec "$@"' >> /entrypoint.sh && \
+    echo '# Start Snapserver (keeps container running)' >> /entrypoint.sh && \
+    echo 'exec /usr/local/bin/snapserver "$@"' >> /entrypoint.sh && \
     chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["/bin/sh"]
+CMD ["-c", "/etc/snapserver.conf"]
