@@ -4,7 +4,7 @@ A Docker image providing the Snapcast server plus optional Spotify Connect via L
 
 ## Features
 - 🎵 **Snapcast Server null** – Multi-room audio streaming
-- 🎧 **Librespot null** – Spotify Connect integration
+- 🎧 **Librespot 0.8.0** – Spotify Connect integration
 - 🔄 **Automated updates** – Daily checks for new releases with automatic rebuilds
 - 🏗️ **Multi-stage build** – Optimized Docker image built from source
 - 🐳 **Minimal Alpine 3.21 base** – Small footprint, secure foundation
